@@ -15,6 +15,7 @@ Examples:
 Output:
       Launches the SeleniumBase Case Plans Generator.
 """
+
 import codecs
 import colorama
 import os
@@ -67,9 +68,7 @@ def show_no_case_plans_warning():
 
 def get_test_id(display_id):
     """The id used in various places such as the test log path."""
-    return (
-        display_id.replace(".py::", ".").replace("::", ".").replace(" ", "_")
-    )
+    return display_id.replace(".py::", ".").replace("::", ".").replace(" ", "_")
 
 
 def generate_case_plan_boilerplates(
@@ -79,90 +78,68 @@ def generate_case_plan_boilerplates(
     tests_with_case_plan,
     tests_without_case_plan,
 ):
-    total_tests = len(tests)
-    total_selected_tests = 0
-    for selected_test in selected_tests:
-        if selected_tests[selected_test].get():
-            total_selected_tests += 1
+    selected_test_cases = [
+        test for test, selected in zip(tests, selected_tests) if selected.get()
+    ]
 
-    test_cases = []
-    case_plans_to_create = []
-    if total_selected_tests == 0:
+    if not selected_test_cases:
         messagebox.showwarning(
             "No tests were selected!",
             "\nℹ️ No tests were selected!\nSelect tests for Case Plans!",
         )
         send_window_to_front(root)
         return
-    elif total_tests == total_selected_tests:
-        for test in tests:
-            test_cases.append(test)
-    else:
-        for test_number, test in enumerate(tests):
-            if selected_tests[test_number].get():
-                test_cases.append(test)
 
-    for test_case in test_cases:
-        if (
-            test_case in tests_without_case_plan
-            and test_case not in tests_with_case_plan
-        ):
-            case_plans_to_create.append(test_case)
+    test_cases = (
+        tests if len(selected_test_cases) == len(tests) else selected_test_cases
+    )
+
+    case_plans_to_create = [
+        test_case
+        for test_case in test_cases
+        if test_case in tests_without_case_plan
+        and test_case not in tests_with_case_plan
+    ]
 
     new_plans = 0
+    plan_template = [
+        "---",
+        "| # | Step Description | Expected Result |",
+        "| - | ---------------- | --------------- |",
+        "| 1 | Perform Action 1 | Verify Action 1 |",
+        "| 2 | Perform Action 2 | Verify Action 2 |",
+        "",
+    ]
+
     for case_plan in case_plans_to_create:
         parts = case_plan.split("/")
-        test_address = None
-        folder_path = None
-        if len(parts) == 1:
-            test_address = parts[0]
-        if len(parts) > 1:
-            test_address = parts[-1]
-            folder_path = "/".join(parts[0:-1])
+        folder_path = "/".join(parts[:-1]) if len(parts) > 1 else "case_plans"
+        test_address = parts[-1]
+
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+
         test_id = get_test_id(test_address)
-        case_id = test_id + ".md"
-        full_folder_path = None
-        if len(parts) == 1:
-            full_folder_path = "case_plans"
-            if not os.path.exists(full_folder_path):
-                os.makedirs(full_folder_path)
-        else:
-            full_folder_path = os.path.join(folder_path, "case_plans")
-            if not os.path.exists(full_folder_path):
-                os.makedirs(full_folder_path)
+        case_id = f"{test_id}.md"
+        file_path = os.path.join(folder_path, "case_plans", case_id)
 
-        data = []
-        data.append("``%s``" % test_address)
-        data.append("---")
-        data.append("| # | Step Description | Expected Result |")
-        data.append("| - | ---------------- | --------------- |")
-        data.append("| 1 | Perform Action 1 | Verify Action 1 |")
-        data.append("| 2 | Perform Action 2 | Verify Action 2 |")
-        data.append("")
-        file_name = case_id
-        file_path = os.path.join(full_folder_path, file_name)
         if not os.path.exists(file_path):
-            out_file = codecs.open(file_path, "w+", "utf-8")
-            out_file.writelines("\r\n".join(data))
-            out_file.close()
+            data = [f"``{test_address}``"] + plan_template
+            with codecs.open(file_path, "w+", "utf-8") as out_file:
+                out_file.write("\r\n".join(data))
             new_plans += 1
-            print("Created %s" % file_path)
+            print(f"Created {file_path}")
 
-    if new_plans == 1:
-        messagebox.showinfo(
-            "A new Case Plan was generated!",
-            '\n✅ %s new boilerplate Case Plan was generated!' % new_plans,
-        )
-    elif new_plans >= 2:
-        messagebox.showinfo(
-            "New Case Plans were generated!",
-            '\n✅ %s new boilerplate Case Plans were generated!' % new_plans,
-        )
-    else:
+    if new_plans == 0:
         messagebox.showwarning(
             "No new Case Plans were generated!",
             "\nℹ️ No new boilerplates were generated!\n\n"
             "The selected tests already have Case Plans!",
+        )
+    else:
+        messagebox.showinfo(
+            f"{new_plans} new Case Plan{'s' if new_plans > 1 else ''} {'were' if new_plans > 1 else 'was'} generated!",
+            f'\n✅ {new_plans} new boilerplate Case Plan{"s" if new_plans > 1 else ""} {"were" if new_plans > 1 else "was"} generated!',
         )
     send_window_to_front(root)
 
@@ -198,9 +175,7 @@ def view_summary_of_existing_case_plans(root, tests):
 
     full_plan = []
     if len(case_data_storage) > 0:
-        full_plan.append(
-            "<h2>Summary of existing Case Plans</h2>"
-        )
+        full_plan.append("<h2>Summary of existing Case Plans</h2>")
         full_plan.append("")
         full_plan.append("|   |   |")
         full_plan.append("| - | - |")
@@ -256,10 +231,7 @@ def view_summary_of_existing_case_plans(root, tests):
                 + first_line[2:-2]
                 + "</b></code></summary>"
             )
-            if (
-                lines[2].strip().startswith("-")
-                and lines[2].strip().endswith("-")
-            ):
+            if lines[2].strip().startswith("-") and lines[2].strip().endswith("-"):
                 lines[2] = ""
             elif lines[2].strip() != "":
                 lines.insert(2, "")
@@ -299,9 +271,7 @@ def view_summary_of_existing_case_plans(root, tests):
 
     plan_head = []
     if len(case_data_storage) > 0:
-        plan_head.append(
-            "<h2>Summary of existing Case Plans</h2>"
-        )
+        plan_head.append("<h2>Summary of existing Case Plans</h2>")
         plan_head.append("")
         plan_head.append("|   |    |   |")
         plan_head.append("| - | -: | - |")
@@ -341,10 +311,9 @@ def view_summary_of_existing_case_plans(root, tests):
         msg_in_progress = " %s" % msg_in_progress
     gen_message = (
         '🗂️  Summary generated at "case_summary.md":'
-        '\n🔵 %s'
-        '\n⭕ %s'
-        '\n🚧 %s'
-        % (msg_ready_cases, msg_boilerplate, msg_in_progress)
+        "\n🔵 %s"
+        "\n⭕ %s"
+        "\n🚧 %s" % (msg_ready_cases, msg_boilerplate, msg_in_progress)
     )
     print(gen_message)
     if num_ready_cases < 10:
@@ -362,10 +331,9 @@ def view_summary_of_existing_case_plans(root, tests):
     messagebox.showinfo(
         "Case Plans Summary generated!",
         '\nSummary generated at "case_summary.md"'
-        '\n🔵 %s'
-        '\n⭕ %s'
-        '\n🚧 %s'
-        % (msg_ready_cases, msg_boilerplate, msg_in_progress)
+        "\n🔵 %s"
+        "\n⭕ %s"
+        "\n🚧 %s" % (msg_ready_cases, msg_boilerplate, msg_in_progress),
     )
     send_window_to_front(root)
 
@@ -380,8 +348,7 @@ def create_tkinter_gui(tests, command_string):
     tk.Label(root, text="").pack()
     run_display = (
         "Select from %s tests found:  "
-        "(Boilerplate Case Plans will be generated as needed)"
-        % len(tests)
+        "(Boilerplate Case Plans will be generated as needed)" % len(tests)
     )
     if len(tests) == 1:
         run_display = (
@@ -391,9 +358,7 @@ def create_tkinter_gui(tests, command_string):
     run_display_2 = "(Tests with existing Case Plans are already checked)"
     tk.Label(root, text=run_display, bg="yellow", fg="green").pack()
     tk.Label(root, text=run_display_2, bg="yellow", fg="magenta").pack()
-    text_area = ScrolledText(
-        root, width=100, height=12, wrap="word", state=tk.DISABLED
-    )
+    text_area = ScrolledText(root, width=100, height=12, wrap="word", state=tk.DISABLED)
     text_area.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
     count = 0
     ara = {}
@@ -452,9 +417,7 @@ def create_tkinter_gui(tests, command_string):
     tk.Label(root, text="").pack()
     tk.Button(
         root,
-        text=(
-            "Generate boilerplate Case Plans "
-            "for selected tests missing them"),
+        text=("Generate boilerplate Case Plans " "for selected tests missing them"),
         fg="green",
         command=lambda: generate_case_plan_boilerplates(
             root,
