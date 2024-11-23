@@ -20,9 +20,8 @@ def log_screenshot(test_logpath, driver, screenshot=None, get=False):
     screenshot_skipped = constants.Warnings.SCREENSHOT_SKIPPED
     screenshot_warning = constants.Warnings.SCREENSHOT_UNDEFINED
     if (
-        (hasattr(sb_config, "no_screenshot") and sb_config.no_screenshot)
-        or screenshot == screenshot_skipped
-    ):
+        hasattr(sb_config, "no_screenshot") and sb_config.no_screenshot
+    ) or screenshot == screenshot_skipped:
         if get:
             return screenshot
         return
@@ -81,18 +80,15 @@ def get_master_time():
 
 
 def get_browser_version(driver):
-    if (
-        python3_11_or_newer
-        and py311_patch2
-        and hasattr(sb_config, "_browser_version")
-    ):
-        return sb_config._browser_version
+    # Inline condition to avoid multiple checks and return early if conditions met.
+    if python3_11_or_newer and py311_patch2:
+        browser_version = getattr(sb_config, "_browser_version", None)
+        if browser_version is not None:
+            return browser_version
+
     driver_capabilities = driver.capabilities
-    if "version" in driver_capabilities:
-        browser_version = driver_capabilities["version"]
-    else:
-        browser_version = driver_capabilities["browserVersion"]
-    return browser_version
+    # Use a single call to get with a fallback to avoid hashtable lookups.
+    return driver_capabilities.get("version", driver_capabilities.get("browserVersion"))
 
 
 def get_driver_name_and_version(driver, browser):
@@ -129,9 +125,7 @@ def log_test_failure_data(test, test_logpath, driver, browser, url=None):
     except Exception:
         pass
     try:
-        driver_name, driver_version = get_driver_name_and_version(
-            driver, browser
-        )
+        driver_name, driver_version = get_driver_name_and_version(driver, browser)
     except Exception:
         pass
     try:
@@ -300,9 +294,7 @@ def log_skipped_test_data(test, test_logpath, driver, browser, reason):
     with suppress(Exception):
         browser_version = get_browser_version(driver)
     with suppress(Exception):
-        driver_name, driver_version = get_driver_name_and_version(
-            driver, browser
-        )
+        driver_name, driver_version = get_driver_name_and_version(driver, browser)
     if browser_version:
         headless = ""
         if test.headless and browser in ["chrome", "edge", "firefox"]:
@@ -487,9 +479,7 @@ def copytree(src, dst, symlinks=False, ignore=None):
         if os.path.isdir(s):
             copytree(s, d, symlinks, ignore)
         else:
-            if not os.path.exists(d) or (
-                os.stat(s).st_mtime - os.stat(d).st_mtime > 1
-            ):
+            if not os.path.exists(d) or (os.stat(s).st_mtime - os.stat(d).st_mtime > 1):
                 shutil.copy2(s, d)
 
 
